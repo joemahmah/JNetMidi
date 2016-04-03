@@ -32,6 +32,10 @@ public class JNetMidi {
      * @param args the command line arguments
      */
     public static void main(String[] args) {
+        if (args.length < 1) {
+            System.err.println("Missing ");
+            System.exit(1);
+        }
         if (args[0].toLowerCase().equals("client")) {
             try {
                 int port = Integer.parseInt(args[1]);
@@ -63,7 +67,14 @@ public class JNetMidi {
                 Logger.getLogger(JNetMidi.class.getName()).log(Level.SEVERE, null, ex);
             } catch (InterruptedException ex) {
                 Logger.getLogger(JNetMidi.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (MidiUnavailableException ex) {
+                Logger.getLogger(JNetMidi.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (Exception ex) {
+                Logger.getLogger(JNetMidi.class.getName()).log(Level.SEVERE, null, ex);
             }
+        } else {
+            System.err.println("Please specify program to open in client or server mode.");
+            System.exit(2);
         }
     }
 }

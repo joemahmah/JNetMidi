@@ -32,23 +32,30 @@ public class Client {
     DatagramSocket client;
     InetAddress host;
     MidiWrapper midi;
+    int hostPort;
+    NetMidi netMidi;
 
     public Client(int port, String serverName) throws SocketException, UnknownHostException, MidiUnavailableException {
+        this(port, serverName, 8080);
+    }
+
+    public Client(int port, String serverName, int serverPort) throws SocketException, UnknownHostException, MidiUnavailableException {
         client = new DatagramSocket(port);
         host = InetAddress.getByName(serverName);
         midi = new MidiWrapper();
+        hostPort = serverPort;
     }
 
-    public void run() throws IOException, InterruptedException {
+    public void run() throws IOException, InterruptedException, MidiUnavailableException {
         try {
-            byte[] receiveData = new byte[1024];
-            byte[] sendData = new byte[1024];
+            byte[] receiveData = new byte[262144];
+            byte[] sendData = new byte[32];
             DatagramPacket reply = new DatagramPacket(receiveData, receiveData.length);
 
             for (int i = 0; i < 10; i++) {
 
-                sendData = "Dank Memes".getBytes();
-                DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, host, 8080);
+                sendData = "0join".getBytes();
+                DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, host, hostPort);
                 client.send(sendPacket);
                 Thread.sleep(25);
             }
@@ -57,13 +64,39 @@ public class Client {
 
                 reply = new DatagramPacket(receiveData, receiveData.length);
                 client.receive(reply);
-                if (reply.getData()[0] == new Character('0')) {
+                byte replyType = receiveData[0];
+
+                if (replyType == '0') {
                     System.out.println("Ping from host!");
-                } else if (reply.getData()[0] == new Character('1')) {
-                    midi.setSoundfont("/home/csguest/midi/GenesiSF.SF2");
-                    midi.loadMidi("/home/csguest/midi/son1hill.mid");
+                    sendData = "1ping".getBytes();
+                    DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, host, hostPort);
+                    client.send(sendPacket);
+                } else if (replyType == '1') {
+                    System.out.println("Host sent midi data!");
+                    midi.loadMidi(NetMidi.parseNetMidi(receiveData),receiveData[1]);
+                    System.out.println("Midi data parsed.");
+                    sendData = "1ready".getBytes();
+                    DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, host, hostPort);
+                    client.send(sendPacket);
+                    System.out.println("Replied to host!");
+                } else if (replyType == '2') {
+                    System.out.println("Server sent kill message! Exiting...");
+                    sendData = "1quit".getBytes();
+                    DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, host, hostPort);
+                    client.send(sendPacket);
+                    System.exit(0);
+                } else if (replyType == '3') {
+                    System.out.println("Host sent stop message!");
+                    midi.stopMidi();
+                    midi.resetMidi();
+                } else if (replyType == '4') {
+                    System.out.println("Host sent play message!");
                     midi.playMidi();
                 }
+
+                sendData = "ping".getBytes();
+                DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, host, 8080);
+                client.send(sendPacket);
             }
         } finally {
             if (client != null) {

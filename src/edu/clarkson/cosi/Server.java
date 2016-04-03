@@ -23,6 +23,8 @@ import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import javax.sound.midi.MidiUnavailableException;
+import javax.sound.midi.Track;
 
 /**
  *
@@ -33,38 +35,94 @@ public class Server {
     DatagramSocket server;
     List<InetAddress> clients;
     int port;
+    int clientPort;
+    MidiWrapper midi;
+    volatile int repliesNeeded;
 
-    public Server(int port) throws SocketException {
+    public Server(int port) throws SocketException, MidiUnavailableException {
+        this(port, 8090);
+    }
+
+    public Server(int port, int clientPort) throws SocketException, MidiUnavailableException {
         server = new DatagramSocket(port);
         clients = new ArrayList<InetAddress>();
         this.port = port;
+        this.clientPort = clientPort;
+        midi = new MidiWrapper();
     }
 
-    public void run() throws IOException, InterruptedException {
-        byte[] receiveData = new byte[1024];
-        byte[] sendData = new byte[1024];
+    public void run() throws IOException, InterruptedException, Exception {
+        byte[] receiveData = new byte[32];
+        byte[] sendData = new byte[262144];
         DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 
         Scanner input = new Scanner(System.in);
-        String command;
+        String[] command;
 
         while (true) {
 
             System.out.print("JNetMidi: ");
-            command = input.nextLine();
+            command = input.nextLine().split(" ");
+            String replyString;
 
-            if (command.equals("ping")) {
+            if (command[0].equals("ping")) {
+                replyString = '0' + "";
                 for (InetAddress address : clients) {
-                    String capitalizedSentence = '0' + "MEMES";
-                    sendData = capitalizedSentence.getBytes();
-                    DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, address, 8090);
+                    sendData = replyString.getBytes();
+                    DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, address, clientPort);
                     server.send(sendPacket);
                 }
-            } else if (command.equals("play")) {
+            } else if (command[0].equals("play")) {
+                if (command.length <= 1) {
+                    System.out.println("Must specify .mid file to play...");
+                } else {
+
+                    midi.loadMidi(command[1]);
+                    if (midi.canPlay()) {
+
+                        NetMidi netMidi = new NetMidi(midi.getTracks(), clients);
+                        String[] tracks = netMidi.getTracks();
+
+                        repliesNeeded = 0;
+
+                        for (int i = 0; i < clients.size(); i++) {
+                            if (i < tracks.length) {
+                                replyString = '1' + tracks[i];
+                                sendData = replyString.getBytes();
+                                DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, clients.get(i), clientPort);
+                                server.send(sendPacket);
+                                repliesNeeded++;
+                            }
+                        }
+
+                        System.out.println("Waiting for " + repliesNeeded + " replies!");
+
+                        while (repliesNeeded > 0) {
+                            Thread.sleep(50);
+                        }
+
+                        System.out.println("All replies in. Playing!");
+
+                        for (InetAddress address : clients) {
+                            replyString = '4' + "";
+                            sendData = replyString.getBytes();
+                            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, address, clientPort);
+                            server.send(sendPacket);
+                        }
+                    }
+                }
+            } else if (command[0].equals("stop")) {
+                replyString = '3' + "";
                 for (InetAddress address : clients) {
-                    String capitalizedSentence = '1' + "MEMES";
-                    sendData = capitalizedSentence.getBytes();
-                    DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, address, 8090);
+                    sendData = replyString.getBytes();
+                    DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, address, clientPort);
+                    server.send(sendPacket);
+                }
+            } else if (command[0].equals("quit")) {
+                replyString = '2' + "";
+                for (InetAddress address : clients) {
+                    sendData = replyString.getBytes();
+                    DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, address, clientPort);
                     server.send(sendPacket);
                 }
             }
@@ -76,7 +134,7 @@ public class Server {
         @Override
         public void run() {
             try {
-                byte[] receiveData = new byte[1024];
+                byte[] receiveData = new byte[32];
                 DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 
                 while (true) {
@@ -86,7 +144,17 @@ public class Server {
                     InetAddress IPAddress = receivePacket.getAddress();
                     if (!clients.contains(IPAddress)) {
                         clients.add(IPAddress);
-                        System.out.println("Client at " + IPAddress.getHostAddress() + " has joined!");
+                        System.out.print("Client at " + IPAddress.getHostAddress() + " has joined.\nJNetMidi: ");
+                    } else {
+                        if (receiveData[0] == '1') {
+                            if (receiveData[1] == 'p') {
+                                System.out.print("Ping reply from " + IPAddress.getHostAddress() + "\nJNetMidi: ");
+                            } else if (receiveData[1] == 'q') {
+                                clients.remove(IPAddress);
+                            } else if (receiveData[1] == 'r') {
+                                repliesNeeded--;
+                            }
+                        }
                     }
                 }
             } catch (Exception e) {

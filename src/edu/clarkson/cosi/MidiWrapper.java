@@ -22,12 +22,14 @@ import java.util.logging.Logger;
 import javax.sound.midi.Instrument;
 import javax.sound.midi.InvalidMidiDataException;
 import javax.sound.midi.MidiDevice;
+import javax.sound.midi.MidiEvent;
 import javax.sound.midi.MidiSystem;
 import javax.sound.midi.MidiUnavailableException;
 import javax.sound.midi.Sequence;
 import javax.sound.midi.Sequencer;
 import javax.sound.midi.Soundbank;
 import javax.sound.midi.Synthesizer;
+import javax.sound.midi.Track;
 
 /**
  *
@@ -52,13 +54,33 @@ public class MidiWrapper {
     public void loadMidi(String location) {
         try {
             sequence = MidiSystem.getSequence(new File(location));
-            
+
             sequencer.setSequence(sequence);
             sequencer.getTransmitter().setReceiver(synth.getReceiver());
             canPlay = true;
         } catch (Exception e) {
-            System.err.println("Unable to load MIDI!");
+            System.err.println("Unable to load MIDI at " + location);
             canPlay = false;
+        }
+    }
+
+    public void loadMidi(String midiString, int bpm) throws MidiUnavailableException {
+        try {
+            sequence = new Sequence(0, 92);
+
+            Track t = sequence.createTrack();
+
+            MidiEvent[] midiEvents = NetMidi.parseMidiString(midiString);
+            for (MidiEvent me : midiEvents) {
+                t.add(me);
+            }
+
+            sequencer.setSequence(sequence);
+            sequencer.getTransmitter().setReceiver(synth.getReceiver());
+            canPlay = true;
+
+        } catch (InvalidMidiDataException ex) {
+            Logger.getLogger(MidiWrapper.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
@@ -94,6 +116,18 @@ public class MidiWrapper {
         }
     }
 
+    public boolean canPlay() {
+        return canPlay;
+    }
+
+    public Track[] getTracks() throws Exception {
+        if (canPlay()) {
+            return sequence.getTracks();
+        } else {
+            throw new Exception("No midi loaded!");
+        }
+    }
+
     public void setSoundfont(String location) {
         try {
             for (Instrument i : synth.getAvailableInstruments()) {
@@ -102,15 +136,15 @@ public class MidiWrapper {
             }
 
             soundbank = MidiSystem.getSoundbank(new File(location));
-            System.out.println("Loaded");   
+            System.out.println("Soundfont Loaded");
             synth.loadAllInstruments(soundbank);
             /*for (Instrument i : synth.getLoadedInstruments()){
-                System.out.println(i);
-            }*/
-            
+             System.out.println(i);
+             }*/
+
             /*for(Instrument i : soundbank.getInstruments()){
-                System.out.println(i);
-            }*/
+             System.out.println(i);
+             }*/
         } catch (InvalidMidiDataException ex) {
             Logger.getLogger(MidiWrapper.class.getName()).log(Level.SEVERE, null, ex);
         } catch (IOException ex) {
@@ -119,4 +153,3 @@ public class MidiWrapper {
     }
 
 }
-
