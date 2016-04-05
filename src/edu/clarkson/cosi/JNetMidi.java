@@ -51,6 +51,8 @@ public class JNetMidi {
                 Logger.getLogger(JNetMidi.class.getName()).log(Level.SEVERE, null, ex);
             } catch (MidiUnavailableException ex) {
                 Logger.getLogger(JNetMidi.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (ClassNotFoundException ex) {
+                Logger.getLogger(JNetMidi.class.getName()).log(Level.SEVERE, null, ex);
             }
         } else if (args[0].toLowerCase().equals("server")) {
             try {

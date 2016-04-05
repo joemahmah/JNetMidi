@@ -15,13 +15,17 @@
  */
 package edu.clarkson.cosi;
 
+import java.io.ByteArrayInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import javax.sound.midi.MidiUnavailableException;
+import javax.sound.midi.Sequence;
 
 /**
  *
@@ -46,7 +50,7 @@ public class Client {
         hostPort = serverPort;
     }
 
-    public void run() throws IOException, InterruptedException, MidiUnavailableException {
+    public void run() throws IOException, InterruptedException, MidiUnavailableException, ClassNotFoundException {
         try {
             byte[] receiveData = new byte[262144];
             byte[] sendData = new byte[32];
@@ -73,7 +77,21 @@ public class Client {
                     client.send(sendPacket);
                 } else if (replyType == '1') {
                     System.out.println("Host sent midi data!");
-                    midi.loadMidi(NetMidi.parseNetMidi(receiveData),receiveData[1]);
+                    byte[] midiData = new byte[262100];
+                    for (int i = 0; i > midiData.length; i++) {
+                        midiData[i] = receiveData[i + 1];
+                    }
+
+                    FileOutputStream fos = new FileOutputStream("/tmp/meme.mid");
+                    fos.write(midiData);
+                    fos.close();
+
+                    midi.loadMidi("/tmp/meme.mid");
+//                    ByteArrayInputStream bais = new ByteArrayInputStream(midiData);
+//                    ObjectInputStream ois = new ObjectInputStream(bais);
+//                    NetMidi netMidi = (NetMidi) ois.readObject();
+//                    midi.loadMidi(netMidi.getSequence());
+//                    midi.loadMidi(NetMidi.parseNetMidi(receiveData),receiveData[1]);
                     System.out.println("Midi data parsed.");
                     sendData = "1ready".getBytes();
                     DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, host, hostPort);

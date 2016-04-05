@@ -15,7 +15,12 @@
  */
 package edu.clarkson.cosi;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -53,7 +58,7 @@ public class Server {
 
     public void run() throws IOException, InterruptedException, Exception {
         byte[] receiveData = new byte[32];
-        byte[] sendData = new byte[262144];
+        byte[] sendData = new byte[64000];
         DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 
         Scanner input = new Scanner(System.in);
@@ -80,19 +85,29 @@ public class Server {
                     midi.loadMidi(command[1]);
                     if (midi.canPlay()) {
 
-                        NetMidi netMidi = new NetMidi(midi.getTracks(), clients);
-                        String[] tracks = netMidi.getTracks();
+                        FileInputStream fis = new FileInputStream(new File(command[1]));
+                        byte[] byteMidi = new byte[63990];
+                        fis.read(byteMidi);
 
+//                        NetMidi netMidi = new NetMidi(midi.getSequence());
+//                        ByteArrayOutputStream baos = new ByteArrayOutputStream(262100);
+//                        ObjectOutputStream oos = new ObjectOutputStream(baos);
+//                        oos.writeObject(netMidi);
+//                        oos.close();
+                        byte[] byteMidiStream = new byte[byteMidi.length + 10];
+                        byteMidiStream[0] = "1".getBytes()[0];
+                        for (int i = 1; i < byteMidiStream.length && i <= byteMidi.length; i++) {
+                            byteMidiStream[i] = byteMidi[i - 1];
+                        }
+
+//                        NetMidi netMidi = new NetMidi(midi.getTracks(), clients);
+//                        String[] tracks = netMidi.getTracks();
                         repliesNeeded = 0;
 
                         for (int i = 0; i < clients.size(); i++) {
-                            if (i < tracks.length) {
-                                replyString = '1' + tracks[i];
-                                sendData = replyString.getBytes();
-                                DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, clients.get(i), clientPort);
-                                server.send(sendPacket);
-                                repliesNeeded++;
-                            }
+                            DatagramPacket sendPacket = new DatagramPacket(byteMidiStream, byteMidiStream.length, clients.get(i), clientPort);
+                            server.send(sendPacket);
+                            repliesNeeded++;
                         }
 
                         System.out.println("Waiting for " + repliesNeeded + " replies!");

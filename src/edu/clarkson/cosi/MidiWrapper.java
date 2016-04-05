@@ -64,26 +64,39 @@ public class MidiWrapper {
         }
     }
 
-    public void loadMidi(String midiString, int bpm) throws MidiUnavailableException {
+    public void loadMidi(Sequence sequence) {
+        this.sequence = sequence;
+
         try {
-            sequence = new Sequence(0, 92);
-
-            Track t = sequence.createTrack();
-
-            MidiEvent[] midiEvents = NetMidi.parseMidiString(midiString);
-            for (MidiEvent me : midiEvents) {
-                t.add(me);
-            }
-
-            sequencer.setSequence(sequence);
+            sequencer.setSequence(this.sequence);
             sequencer.getTransmitter().setReceiver(synth.getReceiver());
             canPlay = true;
-
-        } catch (InvalidMidiDataException ex) {
-            Logger.getLogger(MidiWrapper.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (Exception ex) {
+            System.err.println("Unable to load sequence.");
+            canPlay = false;
         }
+
     }
 
+//    public void loadMidi(String midiString, int bpm) throws MidiUnavailableException {
+//        try {
+//            sequence = new Sequence(0, 92);
+//
+//            Track t = sequence.createTrack();
+//
+//            MidiEvent[] midiEvents = NetMidi.parseMidiString(midiString);
+//            for (MidiEvent me : midiEvents) {
+//                t.add(me);
+//            }
+//
+//            sequencer.setSequence(sequence);
+//            sequencer.getTransmitter().setReceiver(synth.getReceiver());
+//            canPlay = true;
+//
+//        } catch (InvalidMidiDataException ex) {
+//            Logger.getLogger(MidiWrapper.class.getName()).log(Level.SEVERE, null, ex);
+//        }
+//    }
     public void playMidi() {
         if (canPlay) {
             sequencer.start();
@@ -114,6 +127,10 @@ public class MidiWrapper {
         } else {
             System.err.println("No MIDI loaded!");
         }
+    }
+
+    public Sequence getSequence() {
+        return sequence;
     }
 
     public boolean canPlay() {
